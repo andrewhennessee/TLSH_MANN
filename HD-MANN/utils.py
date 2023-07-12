@@ -82,20 +82,18 @@ def normal_dist_variation(x, n_bits, var=0):
     normal_dist = torch.randn(x.shape[0], x.shape[1]) * scale
     return normal_dist
 
-def prob_dist_variation(x, n_bits, var=0, p=0):
-    num_elements = x.shape[0] * x.shape[1]
-    num_varied_elements = int(num_elements * p)
-    scale = var * 2**n_bits
-
-    prob_dist = torch.zeros_like(x)
-    indices = random.sample(range(num_elements), num_varied_elements)
+def FeFET_var(x, p):
+    
+    for v in x:
+        
+        num_elements = v.shape[0]
+        num_varied_elements = int(num_elements * p)
+        indices = random.sample(range(num_elements), num_varied_elements)
  
-    for idx in indices:
-        row_idx = idx // x.shape[1]
-        col_idx = idx % x.shape[1]
-        prob_dist[row_idx, col_idx] = random.choice([-1, 1]) * scale
+        for idx in indices:
+            v[idx] = 1 ^ v[idx]
      
-    return prob_dist
+    return x
 
 def csv_prob_dist_variation(x, n_bits, data):
     prob_dist = torch.zeros_like(x)
