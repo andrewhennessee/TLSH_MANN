@@ -101,7 +101,7 @@ def train(model, data_generator, optimizer, criterion, device, n_bits, var, D=51
     return model, steps, loss_train, val_accs
 
 
-def inference(model, data_generator, device, n_bits, var, data, key_mem_transform = binarize, n_step = 100, sum_argmax=True, type='val'):
+def inference(model, data_generator, device, n_bits, var, data, key_mem_transform = binarize, n_step = 1000, sum_argmax=True, type='val'):
   model.eval()
   accumulated_acc = 0
   if key_mem_transform in (bipolarize, binarize):
@@ -112,9 +112,14 @@ def inference(model, data_generator, device, n_bits, var, data, key_mem_transfor
       support_label = support_label.cpu().numpy()
       query_label = query_label.cpu().numpy()
       with torch.no_grad():
+        
         support_keys = key_mem_transform(model(support_set).cpu().detach().numpy())
+        support_keys = FeFET_var(support_keys, 0.4)
+
         query_keys = key_mem_transform(model(query_set).cpu().detach().numpy())
+        
         dot_sim = get_dot_prod_similarity(query_keys, support_keys)
+        
         sharpened = np.abs(dot_sim)
         if sum_argmax:
           pred = np.dot(sharpened, support_label)
@@ -134,11 +139,11 @@ def inference(model, data_generator, device, n_bits, var, data, key_mem_transfor
       support_label = support_label
       query_label = query_label
       with torch.no_grad():
-        #support_keys = model(support_set)
+        support_keys = model(support_set)
         #query_keys = model(query_set)
 
         ### LINEAR QUANTIZATION ###
-        support_keys = quantize(model(support_set), n_bits)
+        q_support_keys = quantize(support_keys, n_bits)
         query_keys = quantize(model(query_set), n_bits)
 
         ### NORMAL VARIATION ###
@@ -150,8 +155,10 @@ def inference(model, data_generator, device, n_bits, var, data, key_mem_transfor
         #support_keys = support_keys + support_keys_probVariation.to(device)
         
         ### CSV VARIATION ###
-        support_keys_probVariation = csv_prob_dist_variation(support_keys, n_bits, data)
+        support_keys_probVariation = csv_prob_dist_variation(q_support_keys, n_bits, data)
         support_keys = support_keys + support_keys_probVariation.to(device)
+
+        support_keys = quantize(support_keys, n_bits)
 
         ### COSINE SIM ###
         cosine_sim = get_cosine_similarity(query_keys, support_keys)
@@ -174,7 +181,7 @@ if __name__ == '__main__':
   if torch.cuda.is_available():
     device = torch.device('cuda')
 
-    num_bits = 3
+    num_bits = 1
     num_domains = 150
     csv_file_path = f'./var_data/{num_bits}bit/{num_domains}dom.csv'
     with open(csv_file_path, 'r') as file:
@@ -206,7 +213,7 @@ if __name__ == '__main__':
     # evaluation
     model.load_state_dict(torch.load(f'./results_cos/{exp_name}_best.pth.tar'))
     #acc = inference(model, data_gen, device, key_mem_transform=bipolarize, sum_argmax=False, type='test')
-    acc = inference(model, data_gen, device, num_bits, 0.2, data, key_mem_transform=None, sum_argmax=False, type='test')
+    acc = inference(model, data_gen, device, num_bits, 0.2, data, key_mem_transform=binarize, sum_argmax=False, type='test')
     
     print(num_bits)
     print(csv_file_path)
