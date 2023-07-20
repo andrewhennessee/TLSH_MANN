@@ -113,8 +113,25 @@ def inference(model, data_generator, device, n_bits, var, data, key_mem_transfor
       query_label = query_label.cpu().numpy()
       with torch.no_grad():
         
+        # BINARIZE
         support_keys = key_mem_transform(model(support_set).cpu().detach().numpy())
-        support_keys = FeFET_var(support_keys, 0.4)
+        
+        # PACK BITS
+        bits_per_pack = 2
+        packed_support_keys = []
+        for key in support_keys:
+            packed_support_keys.append(pack_bits(key, bits_per_pack))
+        packed_support_keys = torch.tensor(packed_support_keys)
+
+        # INTRODUCE FEFET VARIANCE
+        p = 0.0333
+        var_support_keys = FeFET_var(packed_support_keys, p)
+
+        # UNPACK BITS
+        unpacked_support_keys = []
+        for key in var_support_keys:
+            unpacked_support_keys.append(unpack_bits(key, bits_per_pack)[:support_keys.shape[1]])
+        support_keys = torch.tensor(unpacked_support_keys)
 
         query_keys = key_mem_transform(model(query_set).cpu().detach().numpy())
         
@@ -190,8 +207,8 @@ if __name__ == '__main__':
 
   #for dim in [1024, 2048]:
   for dim in [512]:
-    W = 20 #way
-    S = 5 #shots
+    W = 5 #way
+    S = 1 #shots
     D = dim
     exp_name = f"{W}way{S}shot{D}dim"
     print(exp_name)

@@ -91,7 +91,8 @@ def FeFET_var(x, p):
         indices = random.sample(range(num_elements), num_varied_elements)
  
         for idx in indices:
-            v[idx] = 1 ^ v[idx]
+            if v[idx] > 0:
+                v[idx] = v[idx] - 1
      
     return x
 
@@ -110,3 +111,39 @@ def csv_prob_dist_variation(x, n_bits, data):
         prob_dist[dist_row_idx][dist_col_idx] = var * 2**n_bits
 
     return prob_dist
+
+def pack_bits(input_list, bits_per_pack):
+    packed_list = []
+    current_byte = 0
+    bits_in_current_byte = 0
+
+    for bit in input_list:
+        # Left-shift the current packed integer to make space for the new bit, and then OR it with the new bit (0 or 1)
+        current_byte = (current_byte << 1) | bit
+        bits_in_current_byte += 1
+
+        if bits_in_current_byte == bits_per_pack:
+            # If the current integer is fully packed (contains the desired number of bits), add it to the packed list
+            packed_list.append(current_byte)
+            current_byte = 0
+            bits_in_current_byte = 0
+
+    if bits_in_current_byte > 0:
+        # If there are some remaining bits that didn't form a complete integer, left-shift to fill with zeros and add it
+        current_byte = current_byte << (bits_per_pack - bits_in_current_byte)
+        packed_list.append(current_byte)
+
+    return packed_list
+
+def unpack_bits(input_list, bits_per_pack):
+    unpacked_list = []
+    
+    for num in input_list:
+        # Convert the integer to its binary representation, remove the '0b' prefix, and left-pad with zeros
+        binary_str = bin(num)[2:].zfill(bits_per_pack)
+        
+        # Append each bit to the new list as integers (1s and 0s)
+        for bit in binary_str:
+            unpacked_list.append(int(bit))
+    
+    return unpacked_list
